@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book Highlights</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f5f5f5;
+  color: #1a1a1a;
+  line-height: 1.6;
+  padding: 24px;
+}
+.container { max-width: 680px; margin: 0 auto; }
+
+header {
+  display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+}
+header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+header .sub { color: #888; font-size: 0.9rem; }
+
+nav { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+nav a {
+  color: #555; text-decoration: none; font-size: 0.9rem; cursor: pointer;
+  padding: 6px 14px; border-radius: 20px; border: 1px solid #d0d0d0;
+  transition: all 0.12s;
+}
+nav a:hover { border-color: #888; color: #222; }
+nav a.active { background: #222; color: #fff; border-color: #222; }
+
+.back { display: none; color: #555; cursor: pointer; font-size: 0.9rem; margin-bottom: 16px; }
+.back:hover { color: #222; }
+.back::before { content: "\2190 "; }
+
+.search-wrap { margin-bottom: 20px; }
+.search-wrap input {
+  width: 100%; padding: 10px 14px; border: 1px solid #d0d0d0; border-radius: 8px;
+  font-size: 0.95rem; background: white;
+}
+.search-wrap input:focus { outline: none; border-color: #666; }
+
+.counter { font-size: 0.85rem; color: #999; margin-bottom: 16px; }
+
+.highlight-card {
+  background: white; border-radius: 12px; padding: 24px;
+  margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.highlight-text {
+  font-size: 1.05rem; line-height: 1.7; margin-bottom: 16px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.highlight-meta { font-size: 0.85rem; color: #666; }
+.highlight-meta .title { font-weight: 600; color: #333; }
+.highlight-meta .author { color: #555; }
+.highlight-date { font-size: 0.75rem; color: #aaa; margin-top: 8px; }
+
+.book-card {
+  background: white; border-radius: 12px; padding: 18px 22px;
+  margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  transition: box-shadow 0.12s;
+}
+.book-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.book-card .name { font-weight: 600; }
+.book-card .count { color: #999; font-size: 0.85rem; }
+
+.footnote {
+  text-align: center; color: #aaa; font-size: 0.82rem; margin-top: 48px; padding: 0 24px 24px; line-height: 1.5;
+}
+
+.empty-state {
+  text-align: center; padding: 64px 24px; color: #888;
+}
+.empty-state h2 { font-size: 1.2rem; margin-bottom: 6px; color: #555; }
+
+@media (max-width: 500px) {
+  body { padding: 16px; }
+  .highlight-card { padding: 16px; }
+  .highlight-text { font-size: 1rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Book Highlights</h1>
+    <span class="sub" id="totalLabel"></span>
+  </header>
+
+  <nav>
+    <a id="navRandom" class="active">Random</a>
+    <a id="navBooks">Browse books</a>
+  </nav>
+
+  <div class="back" id="backBtn">All books</div>
+
+  <div class="search-wrap" id="searchWrap">
+    <input type="text" id="search" placeholder="Search highlights..." autocomplete="off">
+  </div>
+
+  <div class="counter" id="counter"></div>
+  <div id="content"></div>
+  <div class="footnote">These are highlights from the books that I am reading. It serves as a memory capsule for me, but I hope you enjoy them as well &lt;3</div>
+</div>
+
+<script>
+const STATE = { highlights: [], view: "random", book: null };
+
+async function load() {
+  try {
+    const res = await fetch("highlights.json");
+    if (!res.ok) throw new Error("Not found");
+    STATE.highlights = await res.json();
+    if (!Array.isArray(STATE.highlights)) STATE.highlights = [];
+  } catch {
+    document.getElementById("content").innerHTML =
+      `<div class="empty-state"><h2>Could not load highlights</h2></div>`;
+    return;
+  }
+  document.getElementById("totalLabel").textContent =
+    `${STATE.highlights.length} highlight${STATE.highlights.length !== 1 ? "s" : ""}`;
+  showRandom();
+}
+
+function getBooks() {
+  const map = {};
+  for (const h of STATE.highlights) {
+    const key = h.title || "Unknown";
+    if (!map[key]) map[key] = { title: key, author: h.author || "", highlights: [] };
+    map[key].highlights.push(h);
+  }
+  return Object.values(map).sort((a, b) => b.highlights.length - a.highlights.length);
+}
+
+function getRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function showRandom() {
+  STATE.view = "random";
+  STATE.book = null;
+  const el = document.getElementById("content");
+  const h = getRandom(STATE.highlights);
+  if (!h) {
+    el.innerHTML = `<div class="empty-state"><h2>No highlights yet</h2></div>`;
+    return;
+  }
+  document.getElementById("navRandom").className = "active";
+  document.getElementById("navBooks").className = "";
+  document.getElementById("backBtn").style.display = "none";
+  document.getElementById("searchWrap").style.display = "none";
+  document.getElementById("counter").textContent = "";
+  el.innerHTML = `
+    <div class="highlight-card">
+      <div class="highlight-text">${escapeHtml(h.text)}</div>
+      <div class="highlight-meta">
+        ${h.title ? `<span class="title">${escapeHtml(h.title)}</span>` : ""}
+        ${h.author ? `<span class="author"> — ${escapeHtml(h.author)}</span>` : ""}
+      </div>
+      ${h.timestamp ? `<div class="highlight-date">${new Date(h.timestamp).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>` : ""}
+    </div>`;
+}
+
+function showBooks() {
+  STATE.view = "books";
+  STATE.book = null;
+  document.getElementById("navRandom").className = "";
+  document.getElementById("navBooks").className = "active";
+  document.getElementById("backBtn").style.display = "none";
+  document.getElementById("searchWrap").style.display = "none";
+  document.getElementById("counter").textContent = "";
+  const books = getBooks();
+  const el = document.getElementById("content");
+  if (books.length === 0) {
+    el.innerHTML = `<div class="empty-state"><h2>No highlights yet</h2></div>`;
+    return;
+  }
+  el.innerHTML = books.map(b =>
+    `<div class="book-card" data-title="${escapeHtml(b.title)}">
+      <div>
+        <div class="name">${escapeHtml(b.title)}</div>
+        ${b.author ? `<div style="font-size:0.8rem;color:#888">${escapeHtml(b.author)}</div>` : ""}
+      </div>
+      <div class="count">${b.highlights.length} highlight${b.highlights.length !== 1 ? "s" : ""}</div>
+    </div>`
+  ).join("");
+  el.querySelectorAll(".book-card").forEach(card => {
+    card.addEventListener("click", () => showBook(card.dataset.title));
+  });
+}
+
+function showBook(title) {
+  STATE.view = "book";
+  STATE.book = title;
+  document.getElementById("navRandom").className = "";
+  document.getElementById("navBooks").className = "";
+  document.getElementById("backBtn").style.display = "block";
+  document.getElementById("searchWrap").style.display = "block";
+  document.getElementById("search").value = "";
+  renderBook();
+}
+
+function renderBook() {
+  const title = STATE.book;
+  const q = (document.getElementById("search").value || "").toLowerCase();
+  let list = STATE.highlights.filter(h => (h.title || "Unknown") === title);
+  if (q) {
+    list = list.filter(h =>
+      (h.text || "").toLowerCase().includes(q) ||
+      (h.author || "").toLowerCase().includes(q)
+    );
+  }
+  list.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+  document.getElementById("counter").textContent =
+    q ? `${list.length} of ${STATE.highlights.filter(h => (h.title || "Unknown") === title).length} highlights in <strong>${escapeHtml(title)}</strong>`
+      : `${list.length} highlight${list.length !== 1 ? "s" : ""} in <strong>${escapeHtml(title)}</strong>`;
+
+  const el = document.getElementById("content");
+  if (list.length === 0) {
+    el.innerHTML = `<div class="empty-state"><h2>No matches</h2></div>`;
+    return;
+  }
+  el.innerHTML = list.map(h => `
+    <div class="highlight-card">
+      <div class="highlight-text">${escapeHtml(h.text)}</div>
+      <div class="highlight-meta">
+        ${h.author ? `<span class="author">${escapeHtml(h.author)}</span>` : ""}
+      </div>
+      ${h.timestamp ? `<div class="highlight-date">${new Date(h.timestamp).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>` : ""}
+    </div>
+  `).join("");
+}
+
+document.getElementById("navRandom").addEventListener("click", showRandom);
+document.getElementById("navBooks").addEventListener("click", showBooks);
+document.getElementById("backBtn").addEventListener("click", showBooks);
+document.getElementById("search").addEventListener("input", renderBook);
+
+load();
+</script>
+</body>
+</html>
