@@ -79,16 +79,35 @@ async def main():
 
 def parse_highlight(text, entities):
     """Parse a Telegram message from @bookshotsbot into {text, title, author}."""
-    parts = {"blockquote": "", "italic": "", "bold": ""}
+    entity_map = {}
     for e in entities:
-        t = type(e).__name__
-        chunk = text[e.offset : e.offset + e.length].strip()
-        if "Blockquote" in t:
-            parts["blockquote"] += chunk + "\n"
-        elif "Bold" in t:
-            parts["bold"] = chunk
-        elif "Italic" in t:
-            parts["italic"] = chunk
+        for i in range(e.offset, e.offset + e.length):
+            entity_map[i] = type(e).__name__
+
+    lines = text.split("\n")
+    parts = {"blockquote": "", "bold": "", "italic": ""}
+    idx = 0
+
+    for line in lines:
+        line_types = set()
+        for i in range(len(line)):
+            t = entity_map.get(idx + i, "plain")
+            line_types.add(t)
+        idx += len(line) + 1
+
+        line = line.strip()
+        if not line:
+            continue
+
+        if "MessageEntityBlockquote" in line_types or "blockquote" in line_types:
+            parts["blockquote"] += line + "\n"
+        elif "MessageEntityBold" in line_types or "bold" in line_types:
+            parts["bold"] = line
+        elif "MessageEntityItalic" in line_types or "italic" in line_types:
+            parts["italic"] = line
+
+    def strip_md(s):
+        return re.sub(r'^[_*]+|[_*]+$', '', s).strip()
 
     text = parts["blockquote"].strip()
     if not text:
@@ -96,8 +115,8 @@ def parse_highlight(text, entities):
 
     return {
         "text": text,
-        "title": parts["italic"],
-        "author": parts["bold"],
+        "title": strip_md(parts["italic"]),
+        "author": strip_md(parts["bold"]),
     }
 
 
