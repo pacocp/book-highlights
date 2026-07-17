@@ -79,35 +79,16 @@ async def main():
 
 def parse_highlight(text, entities):
     """Parse a Telegram message from @bookshotsbot into {text, title, author}."""
-    # Build character-indexed entity map
-    entity_map = {}
+    parts = {"blockquote": "", "italic": "", "bold": ""}
     for e in entities:
-        for i in range(e.offset, e.offset + e.length):
-            entity_map[i] = getattr(e, "type", None) or type(e).__name__
-
-    # Split into blocks by line, tracking entity type per char
-    lines = text.split("\n")
-    parts = {"blockquote": "", "bold": "", "italic": ""}
-    idx = 0
-
-    for line in lines:
-        line_types = set()
-        for i in range(len(line)):
-            t = entity_map.get(idx + i, "plain")
-            line_types.add(t)
-        idx += len(line) + 1  # +1 for newline
-
-        line = line.strip()
-        if not line:
-            continue
-
-        # Determine type from entities on this line
-        if "MessageEntityBlockquote" in line_types or "blockquote" in line_types:
-            parts["blockquote"] += line + "\n"
-        elif "MessageEntityBold" in line_types or "bold" in line_types:
-            parts["bold"] = line
-        elif "MessageEntityItalic" in line_types or "italic" in line_types:
-            parts["italic"] = line
+        t = type(e).__name__
+        chunk = text[e.offset : e.offset + e.length].strip()
+        if "Blockquote" in t:
+            parts["blockquote"] += chunk + "\n"
+        elif "Bold" in t:
+            parts["bold"] = chunk
+        elif "Italic" in t:
+            parts["italic"] = chunk
 
     text = parts["blockquote"].strip()
     if not text:
@@ -115,8 +96,8 @@ def parse_highlight(text, entities):
 
     return {
         "text": text,
-        "title": parts["italic"].strip(),
-        "author": parts["bold"].strip(),
+        "title": parts["italic"],
+        "author": parts["bold"],
     }
 
 

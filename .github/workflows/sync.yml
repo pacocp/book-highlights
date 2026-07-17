@@ -46,4 +46,5 @@ jobs:
           git add highlights.json
           git diff --cached --quiet || git commit -m "sync highlights from telegram"
           git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/${{ github.repository }}
+          git pull --rebase
           git push
